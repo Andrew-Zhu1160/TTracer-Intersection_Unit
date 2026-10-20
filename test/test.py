@@ -38,3 +38,5 @@ async def test_project(dut):
 
     # Keep testing the module by changing the input values, waiting for
     # one or more clock cycles, and asserting the expected output values.
+async def test_intersection_unit(dut):
+    dut._log.info("Start_intersection_unit_smoke_test")
