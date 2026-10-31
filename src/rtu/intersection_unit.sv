@@ -364,10 +364,6 @@ module intersection_unit #(
             sram_rd       <= 1'b0;
             sram_latch    <= 1'b0;
             sram_read     <= 1'b0;
-            bv_r          <= 16'd0;
-            bv_x          <= 16'd0;
-            bv_y          <= 16'd0;
-            bv_z          <= 16'd0;
             bv_r_ready      <= 1'b0;
             bv_origin_ready <= 1'b0;
 
@@ -379,10 +375,6 @@ module intersection_unit #(
             sram_rd       <= 1'b0;
             sram_latch    <= 1'b0;
             sram_read     <= 1'b0;
-            bv_r          <= 16'd0;
-            bv_x          <= 16'd0;
-            bv_y          <= 16'd0;
-            bv_z          <= 16'd0;
             bv_r_ready      <= 1'b0;
             bv_origin_ready <= 1'b0;
 
@@ -602,8 +594,6 @@ module intersection_unit #(
                         endcase
                     end
 
-                end
-
                 S_DEC_SEND: begin
                     case (calc_stage_q)
                         // 1. a = dot(ray_dir, ray_dir)
@@ -638,10 +628,10 @@ module intersection_unit #(
 
                         // 5. r^2 (c = dot(oc, oc) - bv_r * bv_r)
                         CALC_R2: begin
-                            req_op[4:0]                   <= 5'b00110; // Scalar multiplication ux × vx
-                            req_op[20:5], req_op[68:53]   <= slot_b;   // Scalar x: bv_r
-                            req_op[52:21], req_op[100:69] <= 32'b0;    // Disable y, z
-                            req_op[101]                   <= 1'b0;     // Return position
+                            req_op[4:0]                     <= 5'b00110; // Scalar multiplication ux × vx
+                            {req_op[20:5], req_op[68:53]}   <= {slot_b, slot_b}; // Scalar x: bv_r
+                            {req_op[52:21], req_op[100:69]} <= 64'd0;            // Disable y, z
+                            req_op[101]                     <= 1'b0;     // Return position
                             req_valid                     <= 1'b1;
                         end
 
