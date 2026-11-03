@@ -94,19 +94,7 @@ else:
     BV_count = random.randint(1, 16)
     Primitive_start_addr = 17 + BV_count*BV_word_count-1
 
-class MockSRAM:
-    # dut input
-    #dut.sram_addr
-    #dut.sram_rd
 
-    #dut output
-    #dut.sram_data
-    #dut.sram_valid
-    sram = [0] * 512
-    
-    def __init__(self,dut):
-
-    async def run(self,dut):
 
 class MOCK_MACRO_OPS:
     #dut input
