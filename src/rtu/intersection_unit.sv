@@ -27,7 +27,7 @@ package iu_types_pkg;
         S_DEC_DONE = 2'd3
     } dec_state_t;
     
-    // WiP not implemented
+    // wip not implemented
     // p = ray * t
     // outward_normal = (p - bv_origin) / bv_r
     // front_face = (dot(ray_dir, normal) < 0)
@@ -189,7 +189,6 @@ module intersection_unit #(
         end
     endfunction
 
-    // Operand sources for the request fields (spec: "Operand select")
     // Operand sources for the request fields (spec: "Operand select")
     typedef enum logic [3:0] {
         SRC_TC,     // to_centre, then offset (same slots)
@@ -798,15 +797,6 @@ module intersection_unit #(
             slot_f       <= 16'd0;
             slot_g       <= 16'd0;
             slot_h       <= 16'd0;
-            dec_state_q  <= S_DEC_IDLE;
-            bv_index     <= 5'd0;
-            bv_base      <= 9'd17;
-            req_op_q     <= 102'd0;
-            result_q     <= 48'd0;
-            slot_a       <= 16'd0;
-            slot_f       <= 16'd0;
-            slot_g       <= 16'd0;
-            slot_h       <= 16'd0;
             slot_i       <= 16'd0;
             slot_j       <= 16'd0;
             slot_k       <= 16'd0;
@@ -836,10 +826,8 @@ module intersection_unit #(
             dec_state_q <= dec_state_d;
 
             // Every BV starts the step sequence again at CALC_R2
-            // The step advances only when its macro-op result lands, and every
-            // BV restarts the sequence at CALC_R2
-            // Every BV restarts at CALC_R2 and every object at SP_R2; a step
-            // advances only when its macro-op result lands
+            // Every object starts at SP_R2; a step advances only when its
+            // macro-op result lands
             if (bv_phase == PH_CALC || bv_phase == PH_SPHERE) begin
                 if (step_done) calc_stage_q <= calc_stage_d;
             end else if (bv_phase == PH_HEAD) begin
