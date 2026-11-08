@@ -26,18 +26,21 @@ RUN umask 022 && \
 # Install openlane
 RUN pip3 install openlane==2.1.5
 
-# Verilator 5.x (Ubuntu 22.04 apt is 4.038). Do not set VERILATOR_ROOT.
-RUN curl -L -o /tmp/oss-cad-suite.tgz \
-      https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2024-11-08/oss-cad-suite-linux-x64-20241108.tgz \
- && tar -xzf /tmp/oss-cad-suite.tgz -C /opt \
- && rm /tmp/oss-cad-suite.tgz \
- && printf '%s\n' \
-      'source /opt/oss-cad-suite/environment' \
-      'unset VERILATOR_ROOT' \
-    > /etc/profile.d/oss-cad-suite.sh \
- && printf '%s\n' \
-      'source /opt/oss-cad-suite/environment' \
-      'unset VERILATOR_ROOT' \
-      'cd /workspaces/TinyTracer' \
-    >> /home/vscode/.bashrc
+# Verilator 5.x from source. Ubuntu 22.04 apt is 4.038.
+# Do not apt-install verilator, and do not set VERILATOR_ROOT.
+ARG VERILATOR_VERSION=5.036
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git help2man perl perl-doc python3 make autoconf g++ flex bison \
+        libfl2 libfl-dev zlib1g zlib1g-dev \
+ && curl -fsSL -o /tmp/verilator.tar.gz \
+      "https://github.com/verilator/verilator/archive/refs/tags/v${VERILATOR_VERSION}.tar.gz" \
+ && tar -xzf /tmp/verilator.tar.gz -C /tmp \
+ && cd /tmp/verilator-${VERILATOR_VERSION} \
+ && autoconf \
+ && ./configure --prefix=/usr/local \
+ && make -j2 \
+ && make install \
+ && cd / \
+ && rm -rf /tmp/verilator.tar.gz /tmp/verilator-${VERILATOR_VERSION} \
+ && apt-get clean && rm -rf /var/lib/apt/lists/*
 
