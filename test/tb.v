@@ -1,48 +1,70 @@
 `default_nettype none
+//the unit test around this specific module, not top module
+//the external device this module talk to will be mocked
+//according to their intended behavior
+`include "../src/rtu/intersection_unit.sv"
 `timescale 1ns / 1ps
 
-/* This testbench just instantiates the module and makes some convenient wires
-   that can be driven / tested by the cocotb test.py.
+/* Unit testbench for intersection_unit. Cocotb drives these wires from test.py.
 */
-module tb ();
+module tb_intersection_unit ();
 
   // Dump the signals to a VCD file. You can view it with gtkwave or surfer.
   initial begin
     $dumpfile("tb.vcd");
-    $dumpvars(0, tb);
+    $dumpvars(0, tb_intersection_unit);
     #1;
   end
 
-  // Wire up the inputs and outputs:
-  reg clk;
-  reg rst_n;
-  reg ena;
-  reg [7:0] ui_in;
-  reg [7:0] uio_in;
-  wire [7:0] uo_out;
-  wire [7:0] uio_out;
-  wire [7:0] uio_oe;
-`ifdef GL_TEST
-  wire VPWR = 1'b1;
-  wire VGND = 1'b0;
-`endif
+  reg         clk;
+  reg         rst_n;
+  reg         start;
+  wire        done;
+  wire        hit;
+  wire        hit_ground;
+  wire [15:0] hit_t;
+  wire [8:0]  hit_addr;
+  wire        hit_flip;
 
-  tt_um_tinytracer user_project (
+  reg [47:0]  ray_origin;
+  reg [47:0]  ray_dir;
+  reg [4:0]   bv_count;
 
-      // Include power ports for the Gate Level test:
-`ifdef GL_TEST
-      .VPWR(VPWR),
-      .VGND(VGND),
-`endif
+  wire [8:0]  sram_addr;
+  wire        sram_rd;
+  reg [15:0]  sram_data;
+  reg         sram_valid;
 
-      .ui_in  (ui_in),    // Dedicated inputs
-      .uo_out (uo_out),   // Dedicated outputs
-      .uio_in (uio_in),   // IOs: Input path
-      .uio_out(uio_out),  // IOs: Output path
-      .uio_oe (uio_oe),   // IOs: Enable path (active high: 0=input, 1=output)
-      .ena    (ena),      // enable - goes high when design is selected
-      .clk    (clk),      // clock
-      .rst_n  (rst_n)     // not reset
+  wire        req_valid;
+  wire [101:0] req_op;
+  reg         req_ready;
+  reg         resp_valid;
+  reg [47:0]  resp_result;
+  wire        resp_ready;
+
+  intersection_unit iu (
+      .clk        (clk),
+      .rst_n      (rst_n),
+      .start      (start),
+      .done       (done),
+      .hit        (hit),
+      .hit_ground (hit_ground),
+      .hit_t      (hit_t),
+      .hit_addr   (hit_addr),
+      .hit_flip   (hit_flip),
+      .ray_origin (ray_origin),
+      .ray_dir    (ray_dir),
+      .bv_count   (bv_count),
+      .sram_addr  (sram_addr),
+      .sram_rd    (sram_rd),
+      .sram_data  (sram_data),
+      .sram_valid (sram_valid),
+      .req_valid  (req_valid),
+      .req_op     (req_op),
+      .req_ready  (req_ready),
+      .resp_valid (resp_valid),
+      .resp_result(resp_result),
+      .resp_ready (resp_ready)
   );
 
 endmodule
