@@ -18,7 +18,7 @@ test_mode = os.environ.get("TEST_MODE", "FIXED")
 
 
 
-@cocotb.test(timeout_time=5, timeout_unit="min")
+@cocotb.test(timeout_time=5, timeout_unit="sec")
 async def test_intersection_unit(dut):
     dut._log.info("Start intersection_unit_test")
     clock = Clock(dut.clk, 10, units="us")
@@ -50,3 +50,7 @@ async def test_intersection_unit(dut):
     assert expected_result.n == dut.n.value
     assert expected_result.checker == dut.checker.value
     assert expected_result.hit_flip == dut.hit_flip.value
+
+
+
+

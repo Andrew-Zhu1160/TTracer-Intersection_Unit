@@ -163,7 +163,7 @@ class MOCK_RTU(MOCK_MACRO_OPS):
         await ClockCycles(self.dut.clk, 1)
         self.dut.start.value = 0
 
-        timeout = Timer(TEST_TIMEOUT_MIN, units="min")
+        timeout = Timer(TEST_TIMEOUT_MIN * 60, units="sec")
         result = await First(RisingEdge(self.dut.done), timeout)
         if result is timeout:
             raise AssertionError(

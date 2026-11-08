@@ -2,7 +2,7 @@
 //the unit test around this specific module, not top module
 //the external device this module talk to will be mocked
 //according to their intended behavior
-`include "src/rtu/intersection_unit.sv"
+`include "../src/rtu/intersection_unit.sv"
 `timescale 1ns / 1ps
 
 /* Unit testbench for intersection_unit. Cocotb drives these wires from test.py.
