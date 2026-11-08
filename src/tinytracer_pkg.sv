@@ -1,4 +1,6 @@
 /* verilator lint_off UNUSEDPARAM */
+
+
 package tinytracer_pkg;
 
   //---------------------------- System-wide defaults --------------------------
