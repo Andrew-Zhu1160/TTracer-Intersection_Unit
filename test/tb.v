@@ -26,6 +26,18 @@ module tb_intersection_unit ();
   wire [8:0]  hit_addr;
   wire        hit_flip;
 
+  // Debug variables 
+  wire [1:0]  state_q;
+  wire [1:0]  state_d;
+  wire [1:0]  sram_state_q;
+  wire [1:0]  sram_state_d;
+  wire [1:0]  dec_state_q;
+  wire [1:0]  dec_state_d;
+  wire [4:0]  calc_stage_q;
+  wire [4:0]  calc_stage_d;
+  wire [8:0]  dbg_obj_addr;
+  wire [6:0]  dbg_obj_cnt;
+
   reg [47:0]  ray_origin;
   reg [47:0]  ray_dir;
   reg [4:0]   bv_count;
@@ -64,7 +76,19 @@ module tb_intersection_unit ();
       .req_ready  (req_ready),
       .resp_valid (resp_valid),
       .resp_result(resp_result),
-      .resp_ready (resp_ready)
+      .resp_ready (resp_ready),
+
+      // Debug variables 
+      .state_q    (state_q),
+      .state_d    (state_d),
+      .sram_state_q (sram_state_q),
+      .sram_state_d (sram_state_d),
+      .dec_state_q  (dec_state_q),
+      .dec_state_d  (dec_state_d),
+      .calc_stage_q (calc_stage_q),
+      .calc_stage_d (calc_stage_d),
+      .dbg_obj_addr (dbg_obj_addr),
+      .dbg_obj_cnt  (dbg_obj_cnt)
   );
 
 endmodule
