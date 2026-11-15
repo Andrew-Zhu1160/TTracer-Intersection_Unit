@@ -38,35 +38,46 @@ package iu_types_pkg;
     // t = (h + sqrt(h*h - a*c)) / a. A bounding-volume test needs no distance at
     // all and the sphere test only needs the half chord, so the sequence now
     // follows the spec's along/offset form, which the sphere test reuses as is:
-    typedef enum logic [4:0] {
-        CALC_R2     = 5'd0,   // r_s^2 = r_s x r_s                 M_MUL fmt 0       3
-        CALC_TC     = 5'd1,   // to_centre = C - O                 M_VSUB            7
-        CALC_ALONG  = 5'd2,   // along = to_centre . D             M_DOT fmt 1      11
-        CALC_TCSQ   = 5'd3,   // |to_centre_s|^2                   M_DOT fmt 0      11  (u,v by K)
-        CALC_INSIDE = 5'd4,   // |to_centre_s|^2 < r_s^2 ?         M_LT              3  yes: reach
-        CALC_BEHIND = 5'd5,   // along < 0 ?                       M_LT              3  yes: skip
-        CALC_M      = 5'd6,   // along x D                         M_SCAL_VEC fmt 1  7
-        CALC_OFF    = 5'd7,   // offset = along x D - to_centre    M_VSUB            7
-        CALC_OFFSQ  = 5'd8,   // |offset_s|^2                      M_DOT fmt 0      11  (u,v by K)
-        CALC_REACH  = 5'd9,   // |offset_s|^2 < r_s^2 ?            M_LT              3  yes: reach
+    typedef enum logic [5:0] {
+        CALC_R2     = 6'd0,   // r_s^2 = r_s x r_s                 M_MUL fmt 0       3
+        CALC_TC     = 6'd1,   // to_centre = C - O                 M_VSUB            7
+        CALC_ALONG  = 6'd2,   // along = to_centre . D             M_DOT fmt 1      11
+        CALC_TCSQ   = 6'd3,   // |to_centre_s|^2                   M_DOT fmt 0      11  (u,v by K)
+        CALC_INSIDE = 6'd4,   // |to_centre_s|^2 < r_s^2 ?         M_LT              3  yes: reach
+        CALC_BEHIND = 6'd5,   // along < 0 ?                       M_LT              3  yes: skip
+        CALC_M      = 6'd6,   // along x D                         M_SCAL_VEC fmt 1  7
+        CALC_OFF    = 6'd7,   // offset = along x D - to_centre    M_VSUB            7
+        CALC_OFFSQ  = 6'd8,   // |offset_s|^2                      M_DOT fmt 0      11  (u,v by K)
+        CALC_REACH  = 6'd9,   // |offset_s|^2 < r_s^2 ?            M_LT              3  yes: reach
         // Sphere test (spec 5d). The first six steps are the same walk as the
         // BV test, so they reuse the same slots; only the radius and centre
         // come from the object record instead of the BV record.
-        SP_R2       = 5'd10,  // r_s^2 = r_s x r_s                 M_MUL fmt 0       3
-        SP_TC       = 5'd11,  // to_centre = C - O                 M_VSUB            7
-        SP_ALONG    = 5'd12,  // along = to_centre . D             M_DOT fmt 1      11
-        SP_M        = 5'd13,  // along x D                         M_SCAL_VEC fmt 1  7
-        SP_OFF      = 5'd14,  // offset = along x D - to_centre    M_VSUB            7
-        SP_OFFSQ    = 5'd15,  // |offset_s|^2                      M_DOT fmt 0      11  (u,v by K)
-        SP_MISS     = 5'd16,  // |offset_s|^2 < r_s^2 ?            M_LT              3  no: miss
-        SP_HALF2    = 5'd17,  // r_s^2 - |offset_s|^2              M_SUB             3
-        SP_SQRT     = 5'd18,  // half_s = sqrt(r_s^2 - off_s^2)    M_SQRT fmt 0     25
-        SP_T        = 5'd19,  // t = along - half                  M_SUB             3  entry point
-        SP_TGATE    = 5'd20,  // 0.0156 < t ?                      M_LT              3  yes: candidate
-        SP_T2       = 5'd21,  // t = along + half                  M_ADD             3  exit point, flip 1
-        SP_TGATE2   = 5'd22,  // 0.0156 < t ?                      M_LT              3  no: miss
-        SP_BEST     = 5'd23,  // t < best t ?                      M_LT              3  yes: keep
-        CALC_DONE   = 5'd24   // this BV or this object is finished
+        SP_R2       = 6'd10,  // r_s^2 = r_s x r_s                 M_MUL fmt 0       3
+        SP_TC       = 6'd11,  // to_centre = C - O                 M_VSUB            7
+        SP_ALONG    = 6'd12,  // along = to_centre . D             M_DOT fmt 1      11
+        SP_M        = 6'd13,  // along x D                         M_SCAL_VEC fmt 1  7
+        SP_OFF      = 6'd14,  // offset = along x D - to_centre    M_VSUB            7
+        SP_OFFSQ    = 6'd15,  // |offset_s|^2                      M_DOT fmt 0      11  (u,v by K)
+        SP_MISS     = 6'd16,  // |offset_s|^2 < r_s^2 ?            M_LT              3  no: miss
+        SP_HALF2    = 6'd17,  // r_s^2 - |offset_s|^2              M_SUB             3
+        SP_SQRT     = 6'd18,  // half_s = sqrt(r_s^2 - off_s^2)    M_SQRT fmt 0     25
+        SP_T        = 6'd19,  // t = along - half                  M_SUB             3  entry point
+        SP_TGATE    = 6'd20,  // 0.0156 < t ?                      M_LT              3  yes: candidate
+        SP_T2       = 6'd21,  // t = along + half                  M_ADD             3  exit point, flip 1
+        SP_TGATE2   = 6'd22,  // 0.0156 < t ?                      M_LT              3  no: miss
+        SP_BEST     = 6'd23,  // t < best t ?                      M_LT              3  yes: keep
+        // Ground test (spec 5f). Runs only when no object was hit, and only
+        // when the ray points down. A clamped divide means the floor is too
+        // far away, which counts as sky.
+        GR_UP       = 6'd25,  // D_z < 0 ?                         M_LT              3  no: sky
+        GR_T        = 6'd26,  // t = O_z / -D_z                    M_DIV            19
+        // Winner steps (spec 5g). The hit point for every hit, then n for the
+        // winner only: the ground n and the checker bit need no macro-op.
+        H1          = 6'd27,  // best t x D                        M_SCAL_VEC fmt 1  7
+        H2          = 6'd28,  // H = O + (best t x D)              M_VADD            7
+        S2          = 6'd29,  // H - C, or C - H when flip = 1     M_VSUB            7
+        S4          = 6'd30,  // n = that / r                      M_SPHERE_NORM    57
+        CALC_DONE   = 6'd63   // this BV, object or winner is finished
         // WiP for hit_flip
 
     } calc_stage_t;
@@ -74,15 +85,20 @@ package iu_types_pkg;
     // Phase: which memory read or step sequence is running. PH_READ is BV
     // w1-w4, PH_W0 is BV w0 (reach only), PH_OBJ is an object's w0 (type bit),
     // PH_HEAD its w3-w6, PH_SPHERE the sphere steps, the rest advance.
-    typedef enum logic [2:0] {
-        PH_READ     = 3'd0,
-        PH_CALC     = 3'd1,
-        PH_W0       = 3'd2,
-        PH_NEXT     = 3'd3,
-        PH_OBJ      = 3'd4,
-        PH_HEAD     = 3'd5,
-        PH_SPHERE   = 3'd6,
-        PH_OBJ_NEXT = 3'd7
+    typedef enum logic [3:0] {
+        PH_READ     = 4'd0,
+        PH_CALC     = 4'd1,
+        PH_W0       = 4'd2,
+        PH_NEXT     = 4'd3,
+        PH_OBJ      = 4'd4,
+        PH_HEAD     = 4'd5,
+        PH_SPHERE   = 4'd6,
+        PH_OBJ_NEXT = 4'd7,
+        PH_GROUND   = 4'd8,   // the ground test, only when nothing was hit
+        PH_WIN      = 4'd9,   // the winner steps: H, then n
+        PH_WIN_C    = 4'd10,  // winner burst: the sphere centre w4-w6
+        PH_WIN_R    = 4'd11,  // winner burst: the sphere radius w3, unshifted
+        PH_CHECK    = 4'd12   // nothing left to do: report
     } bv_phase_t;
 endpackage
 /* verilator lint_on DECLFILENAME */
@@ -107,9 +123,13 @@ module intersection_unit #(
     output logic                   done,        // 1-cycle pulse: the hit outputs are valid
     output logic                   hit,         // 1 = object or ground hit, 0 = sky
     output logic                   hit_ground,  // 1 = the hit is the ground (only with hit = 1)
-    output logic [WLEN-1:0]        hit_t,       // distance to the hit, POS (Q9.7)
     output logic [ADDR_WIDTH-1:0]  hit_addr,    // SRAM address of the hit object's w0
     output logic                   hit_flip,    // sphere: ray started inside; triangle: back side
+    output logic [47:0]            hit_point,   // H, POS: z [47:32], y [31:16], x [15:0]
+    output logic [47:0]            n,           // out-arrow, DIR, faces the ray, same field order
+    output logic                   checker_bit, // hit_point[9] XOR hit_point[25], ground only
+                                                       // (the spec calls it `checker`, which is a
+                                                       //  SystemVerilog keyword)
 
     // Ray and scene, from RTU registers (must not change from start to done)
     input  logic [47:0]            ray_origin,  // O, POS (Q9.7): z [47:32], y [31:16], x [15:0]
@@ -189,8 +209,18 @@ module intersection_unit #(
         end
     endfunction
 
+    // Two's complement with the POS clamp, used for the negated ground divisor
+    function automatic logic [15:0] neg16(input logic [15:0] v);
+        logic signed [16:0] w;
+        begin
+            w = -$signed({v[15], v});
+            if (w > 17'sd32767) neg16 = 16'h7FFF;
+            else                neg16 = w[15:0];
+        end
+    endfunction
+
     // Operand sources for the request fields (spec: "Operand select")
-    typedef enum logic [3:0] {
+    typedef enum logic [4:0] {
         SRC_TC,     // to_centre, then offset (same slots)
         SRC_C,      // centre: BV w2-w4, then the object's w4-w6
         SRC_D,      // ray direction
@@ -204,7 +234,12 @@ module intersection_unit #(
         SRC_BESTT,  // best t so far
         SRC_C0156,  // constant 0.0156 (0x0002)
         SRC_PRV,    // the previous macro-op result
-        SRC_ZERO    // constant 0
+        SRC_ZERO,   // constant 0
+        SRC_DZ,     // only the z part of the ray direction
+        SRC_OZ,     // only the z part of the ray origin
+        SRC_RADIUS, // the raw radius of the winner, unshifted
+        SRC_WA,     // winner: H, or C when the ray started inside
+        SRC_WB      // winner: C, or H when the ray started inside
     } src_t;
 
     // How a request field goes through the size shifter: untouched, by +K
@@ -278,15 +313,14 @@ module intersection_unit #(
                 if (start) state_d = S_RTU_LOAD;
             end
             S_RTU_LOAD: begin
-                // Routing check for bv_count
-                if (bv_count == 0) state_d = S_CHECKOUT;
-                else state_d = S_PROCESS_BV;
+                // A scene with no BVs still needs the ground test, so there is
+                // no short cut to CHECKOUT here
+                state_d = S_PROCESS_BV;
             end
             S_PROCESS_BV: begin
-                // Checkout after computed all bv object intersection
-                if (bv_phase == PH_NEXT) begin
-                    if (bv_index + 5'd1 >= bv_count) state_d = S_CHECKOUT;
-                end
+                // Report once the BV walk, the ground test and the winner
+                // steps are all finished
+                if (bv_phase == PH_CHECK) state_d = S_CHECKOUT;
             end
             S_CHECKOUT: begin
                 // Return to IDLE state after reporting (done is pulsed for one
@@ -405,6 +439,12 @@ module intersection_unit #(
             SP_T2:       calc_stage_d = SP_TGATE2;
             SP_TGATE2:   calc_stage_d = SP_BEST;       // overridden when it fails
             SP_BEST:     calc_stage_d = CALC_DONE;
+            GR_UP:       calc_stage_d = GR_T;          // overridden when the ray points up
+            GR_T:        calc_stage_d = CALC_DONE;
+            H1:          calc_stage_d = H2;
+            H2:          calc_stage_d = CALC_DONE;
+            S2:          calc_stage_d = CALC_DONE;
+            S4:          calc_stage_d = CALC_DONE;
             default:     calc_stage_d = CALC_DONE;
         endcase
 
@@ -414,6 +454,7 @@ module intersection_unit #(
             if (calc_stage_q == SP_MISS    && !resp_result[0]) calc_stage_d = CALC_DONE;
             if (calc_stage_q == SP_TGATE   && resp_result[0])  calc_stage_d = SP_BEST;
             if (calc_stage_q == SP_TGATE2  && !resp_result[0]) calc_stage_d = CALC_DONE;
+            if (calc_stage_q == GR_UP      && !resp_result[0]) calc_stage_d = CALC_DONE;
         end
     end
 
@@ -427,6 +468,8 @@ module intersection_unit #(
         src_v  = SRC_D;
         sh_u   = SH_NONE;
         sh_v   = SH_NONE;
+        neg_u  = 1'b0;
+        neg_v  = 1'b0;
 
         case (calc_stage_q)
             // --- bounding volume test (spec 5c) ---
@@ -480,6 +523,23 @@ module intersection_unit #(
             SP_TGATE2:   begin opcode = M_LT;       fmt = 1'b0; src_u = SRC_C0156; src_v = SRC_T;     end
             // 14. is this hit closer than the best one so far?
             SP_BEST:     begin opcode = M_LT;       fmt = 1'b0; src_u = SRC_T;     src_v = SRC_BESTT; end
+
+            // --- ground test (spec 5f) ---
+            // 1. does the ray point down?
+            GR_UP:       begin opcode = M_LT;       fmt = 1'b0; src_u = SRC_DZ;    src_v = SRC_ZERO;  end
+            // 2. t = O_z / -D_z, the negated divisor made on the way in so the
+            //    divide sees a positive number as the CORDIC requires
+            GR_T:        begin opcode = M_DIV;      fmt = 1'b0; src_u = SRC_OZ;    src_v = SRC_DZ;   neg_v = 1'b1; end
+
+            // --- winner steps (spec 5g) ---
+            // 1. best t x D
+            H1:          begin opcode = M_SCAL_VEC; fmt = 1'b1; src_u = SRC_BESTT; src_v = SRC_D;     end
+            // 2. H = O + (best t x D)
+            H2:          begin opcode = M_VADD;     fmt = 1'b0; src_u = SRC_O;     src_v = SRC_PRV;   end
+            // 3. H - C, or C - H when the ray started inside, so n faces the ray
+            S2:          begin opcode = M_VSUB;     fmt = 1'b0; src_u = SRC_WA;    src_v = SRC_WB;    end
+            // 4. n = that / r. Field u.x holds the raw radius, no K shift
+            S4:          begin opcode = M_SPHERE_NORM; fmt = 1'b0; src_u = SRC_RADIUS; src_v = SRC_PRV; end
             default:     ;
         endcase
     end
@@ -500,6 +560,13 @@ module intersection_unit #(
             SRC_BESTT: src_sel = {16'd0, 16'd0, best_t_q};
             SRC_C0156: src_sel = {16'd0, 16'd0, 16'h0002};
             SRC_PRV:   src_sel = result_q;
+            SRC_DZ:    src_sel = {16'd0, 16'd0, ray_dir[47:32]};
+            SRC_OZ:    src_sel = {16'd0, 16'd0, ray_origin[47:32]};
+            SRC_RADIUS:src_sel = {16'd0, 16'd0, slot_j};
+            // Winner: with the flip bit the two slide past each other, so one
+            // subtract gives H - C outside the surface and C - H inside it
+            SRC_WA:    src_sel = best_flip_q ? {slot_c, slot_d, slot_e} : hit_point_q;
+            SRC_WB:    src_sel = best_flip_q ? hit_point_q : {slot_c, slot_d, slot_e};
             default:   src_sel = 48'd0;
         endcase
     endfunction
@@ -524,9 +591,28 @@ module intersection_unit #(
             v_vec[31:16] = kshift($signed(v_raw[31:16]), (sh_v == SH_NK) ? -k_q : k_q);
             v_vec[15:0]  = kshift($signed(v_raw[15:0]),  (sh_v == SH_NK) ? -k_q : k_q);
         end
+
+        // Negate on the way in, which is where the ground test makes its
+        // divisor positive without spending a macro-op on it
+        if (neg_u) begin
+            u_vec[47:32] = neg16(u_vec[47:32]);
+            u_vec[31:16] = neg16(u_vec[31:16]);
+            u_vec[15:0]  = neg16(u_vec[15:0]);
+        end
+        if (neg_v) begin
+            v_vec[47:32] = neg16(v_vec[47:32]);
+            v_vec[31:16] = neg16(v_vec[31:16]);
+            v_vec[15:0]  = neg16(v_vec[15:0]);
+        end
     end
 
     assign req_field = {fmt, u_vec, v_vec, opcode};
+
+    // Winner outputs: driven straight from their registers so they stay put
+    // from done until the next start
+    assign hit_point = hit_point_q;
+    assign n         = n_q;
+    assign checker_bit = hit_ground_q & (hit_point_q[9] ^ hit_point_q[25]);
 
     // Internal tracking
     // SRAM read progress
@@ -562,9 +648,15 @@ module intersection_unit #(
     logic        best_flip_q;
     logic        hit_any_q;
     logic        cand_flip;     // the candidate t came from the exit point
+    logic        best_type_q;   // winner: 0 sphere, 1 triangle (triangle test still WiP)
+    // Winner outputs, held from done until the next start (decisions 4, 5, 6)
+    logic [47:0] hit_point_q;   // H, POS
+    logic [47:0] n_q;           // the out-arrow, DIR
+    logic        hit_ground_q;  // the winner is the ground
     // Request construction
     src_t         src_u, src_v;
     shift_t       sh_u, sh_v;
+    logic         neg_u, neg_v;
     logic [4:0]   opcode;
     logic         fmt;
     logic [47:0]  u_raw, v_raw, u_vec, v_vec;
@@ -576,9 +668,10 @@ module intersection_unit #(
     assign req_valid  = (dec_state_q == S_DEC_SEND) ||
                         ((dec_state_q == S_DEC_IDLE) && calc_active);
     assign req_op     = (dec_state_q == S_DEC_SEND) ? req_op_q : req_field;
-    assign resp_ready = step_done;
+    assign resp_ready = 1'b1;   // spec 5.5: tied high, the Decode leaves on it
     assign step_done  = (dec_state_q == S_DEC_WAIT) && resp_valid;
-    assign calc_active = (bv_phase == PH_CALC) || (bv_phase == PH_SPHERE);
+    assign calc_active = (bv_phase == PH_CALC) || (bv_phase == PH_SPHERE) ||
+                         (bv_phase == PH_GROUND) || (bv_phase == PH_WIN);
 
     // 2 cycles per word: the pulse travels with the capture of the word before
     assign sram_rd = (sram_state_q == S_SRAM_SEND) ||
@@ -588,8 +681,9 @@ module intersection_unit #(
     // one burst per phase; the phase block decides which record it reads
     assign sram_start = (state_q == S_PROCESS_BV) &&
                         (sram_state_q == S_SRAM_IDLE) &&
-                        ((bv_phase == PH_READ) || (bv_phase == PH_W0) ||
-                         (bv_phase == PH_OBJ)  || (bv_phase == PH_HEAD));
+                        ((bv_phase == PH_READ)   || (bv_phase == PH_W0) ||
+                         (bv_phase == PH_OBJ)    || (bv_phase == PH_HEAD) ||
+                         (bv_phase == PH_WIN_C)  || (bv_phase == PH_WIN_R));
 
     // K and r_s for the BV under test, taken from the radius word as it lands
     // (spec 5d: K = highest 1 bit of the raw radius - 10, so r_s is 8 to 16)
@@ -620,7 +714,6 @@ module intersection_unit #(
             hit_ground <= 1'b0;
             hit_flip   <= 1'b0;
             hit_addr   <= 9'd0;
-            hit_t      <= 16'h7FFF;
         end else if (start) begin
             // A new segment starts with no hit; the object and ground tests
             // set these, the BV search alone cannot
@@ -630,7 +723,6 @@ module intersection_unit #(
             hit_ground <= 1'b0;
             hit_flip   <= 1'b0;
             hit_addr   <= 9'd0;
-            hit_t      <= 16'h7FFF;
         end else begin
             state_q <= state_d;
             
@@ -645,12 +737,11 @@ module intersection_unit #(
                 end
 
                 S_CHECKOUT: begin
-                    // 1-cycle pulse: the hit outputs are valid. hit_ground stays
-                    // 0 until the ground test lands.
+                    // 1-cycle pulse: the hit outputs are valid. hit_point and n
+                    // are already correct and stay put until the next start.
                     done       <= 1'b1;
                     hit        <= hit_any_q;
-                    hit_ground <= 1'b0;
-                    hit_t      <= best_t_q;
+                    hit_ground <= hit_ground_q;
                     hit_addr   <= best_addr_q;
                     hit_flip   <= best_flip_q;
                 end
@@ -711,6 +802,18 @@ module intersection_unit #(
                                 sram_w_index <= 3'd1;
                                 sram_w_last  <= 3'd4;
                             end
+                            // winner: the centre of the best sphere, w4-w6
+                            PH_WIN_C: begin
+                                sram_addr    <= best_addr_q + 9'd4;
+                                sram_w_index <= 3'd2;
+                                sram_w_last  <= 3'd4;
+                            end
+                            // winner: the radius at its true size, w3
+                            PH_WIN_R: begin
+                                sram_addr    <= best_addr_q + 9'd3;
+                                sram_w_index <= 3'd0;
+                                sram_w_last  <= 3'd0;
+                            end
                             default: begin
                                 sram_addr    <= bv_base + 9'd1;
                                 sram_w_index <= 3'd1;
@@ -736,6 +839,7 @@ module intersection_unit #(
                         case (sram_w_index)
                             3'd0: begin
                                 // w0: BV object list or object type, see the phase block
+                                if (bv_phase == PH_WIN_R) slot_j <= sram_data; // raw winner radius
                             end
                             3'd1: begin
                                 slot_b     <= rs_next; // radius, already shifted by K
@@ -808,6 +912,12 @@ module intersection_unit #(
             best_flip_q  <= 1'b0;
             hit_any_q    <= 1'b0;
             cand_flip    <= 1'b0;
+            best_type_q  <= 1'b0;
+            hit_point_q  <= 48'd0;
+            n_q          <= 48'd0;
+            hit_ground_q <= 1'b0;
+            bv_phase     <= PH_READ;
+            calc_stage_q <= CALC_R2;
 
         end else if (start) begin
             // Reset the BV loop for a new ray
@@ -821,6 +931,13 @@ module intersection_unit #(
             best_flip_q  <= 1'b0;
             hit_any_q    <= 1'b0;
             cand_flip    <= 1'b0;
+            best_type_q  <= 1'b0;
+            hit_point_q  <= 48'd0;
+            n_q          <= 48'd0;
+            hit_ground_q <= 1'b0;
+            // a scene with no BVs goes straight to the ground test
+            bv_phase     <= (bv_count == 5'd0) ? PH_GROUND : PH_READ;
+            calc_stage_q <= (bv_count == 5'd0) ? GR_UP     : CALC_R2;
 
         end else begin
             dec_state_q <= dec_state_d;
@@ -828,11 +945,12 @@ module intersection_unit #(
             // Every BV starts the step sequence again at CALC_R2
             // Every object starts at SP_R2; a step advances only when its
             // macro-op result lands
-            if (bv_phase == PH_CALC || bv_phase == PH_SPHERE) begin
+            if (bv_phase == PH_CALC || bv_phase == PH_SPHERE ||
+                bv_phase == PH_GROUND || bv_phase == PH_WIN) begin
                 if (step_done) calc_stage_q <= calc_stage_d;
             end else if (bv_phase == PH_HEAD) begin
                 calc_stage_q <= SP_R2;
-            end else begin
+            end else if (bv_phase == PH_READ) begin
                 calc_stage_q <= CALC_R2;
             end
 
@@ -1011,8 +1129,40 @@ module intersection_unit #(
                                     best_t_q    <= slot_k;
                                     best_addr_q <= obj_addr_q;
                                     best_flip_q <= cand_flip;
+                                    best_type_q <= obj_tri;
                                     hit_any_q   <= 1'b1;
                                 end
+                            end
+
+                            // ground test (spec 5f)
+                            GR_UP: begin
+                                // Latch result (Compare): the phase block reads it
+                            end
+
+                            GR_T: begin
+                                // The phase block stores it as best t; a clamp of
+                                // 0x7FFF tells it the floor is too far away
+                            end
+
+                            // winner steps (spec 5g)
+                            H1: begin
+                                // Nothing to keep: H2 reads result_q
+                            end
+
+                            H2: begin
+                                // Latch result (Vector 3): the hit point, held
+                                // until the next start
+                                hit_point_q  <= resp_result;
+                            end
+
+                            S2: begin
+                                // Nothing to keep: S4 reads result_q
+                            end
+
+                            S4: begin
+                                // Latch result (Vector 3): the out-arrow, held
+                                // until the next start
+                                n_q          <= resp_result;
                             end
 
                             // WiP for hit_flip
@@ -1068,12 +1218,59 @@ module intersection_unit #(
                     obj_addr_q <= obj_addr_q + (obj_tri ? 9'd12 : 9'd7);
                 end
                 PH_NEXT: begin
-                    bv_phase <= PH_READ;
                     if (bv_index + 5'd1 < bv_count) begin
+                        bv_phase <= PH_READ;
                         bv_index <= bv_index + 5'd1;
                         bv_base  <= bv_base + 9'd5;
+                    end else if (hit_any_q) begin
+                        // an object was hit: build H and n for the winner
+                        bv_phase     <= PH_WIN;
+                        calc_stage_q <= H1;
+                    end else begin
+                        // nothing was hit, so the floor gets its turn
+                        bv_phase     <= PH_GROUND;
+                        calc_stage_q <= GR_UP;
                     end
                 end
+                // the ground test (spec 5f): only a downward ray can reach it
+                PH_GROUND: if (step_done) begin
+                               if (calc_stage_q == GR_UP && !resp_result[0]) begin
+                                   bv_phase <= PH_CHECK;   // the ray points up: sky
+                               end else if (calc_stage_q == GR_T) begin
+                                   if (resp_result[15:0] != 16'h7FFF) begin
+                                       // floor at this distance, and it wins because
+                                       // no object was found
+                                       best_t_q     <= resp_result[15:0];
+                                       hit_ground_q <= 1'b1;
+                                       hit_any_q    <= 1'b1;
+                                       n_q          <= {16'h4000, 16'd0, 16'd0};
+                                       bv_phase     <= PH_WIN;
+                                       calc_stage_q <= H1;
+                                   end else begin
+                                       bv_phase <= PH_CHECK;   // clamped: too far, sky
+                                   end
+                               end
+                           end
+                // winner steps (spec 5g): the hit point first, then n
+                PH_WIN: if (step_done) begin
+                            if (calc_stage_q == H2) begin
+                                // the ground n is a constant; a triangle n path is
+                                // the next feature, so only a sphere rebuilds here
+                                bv_phase <= (hit_ground_q || best_type_q) ? PH_CHECK : PH_WIN_C;
+                            end else if (calc_stage_q == S2) begin
+                                bv_phase <= PH_WIN_R;
+                            end else if (calc_stage_q == S4) begin
+                                bv_phase <= PH_CHECK;
+                            end
+                        end
+                PH_WIN_C: if (sram_read) begin
+                              bv_phase     <= PH_WIN;
+                              calc_stage_q <= S2;
+                          end
+                PH_WIN_R: if (sram_read) begin
+                              bv_phase     <= PH_WIN;
+                              calc_stage_q <= S4;
+                          end
                 default: ;
             endcase
         end
