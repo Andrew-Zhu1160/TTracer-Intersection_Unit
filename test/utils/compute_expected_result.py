@@ -5,13 +5,33 @@ from constant.constants import (
     SPHERE_WORD_COUNT,
     TRIANGLE_WORD_COUNT,
 )
+from constant.macro_opcode import (
+    M_ADD,
+    M_DIV,
+    M_DOT,
+    M_EQ,
+    M_GE,
+    M_LT,
+    M_MUL,
+    M_NE,
+    M_SCAL_VEC,
+    M_SPHERE_NORM,
+    M_SQRT,
+    M_SUB,
+    M_VADD,
+    M_VSUB,
+)
+from utils.convert_u16_to_float import (
+    convert_float_to_2_14_u16,
+    convert_float_to_9_7_u16,
+    pack_vec3_u16,
+)
 from utils.fixed_point import (
     BEHIND_T,
     BEST_T_INIT,
     DIR_ONE,
     FMT_DIR,
     FMT_POS,
-    INT16_MAX,
     POS_225,
     add,
     clamp16,
@@ -20,20 +40,21 @@ from utils.fixed_point import (
     k_triangle,
     m_norm,
     mul,
-    pack48,
     scal_vec,
     shift_k,
     shift_vec,
     signed16,
-    sphere_norm,
-    sqrt_fmt,
     sub,
     u16,
-    vadd,
     vcross,
     vdot,
     vsub,
 )
+from utils.vector_algebra import vector_algebra
+
+_COMPARE_OPS = {M_EQ, M_NE, M_LT, M_GE}
+_C0156 = 0x0002
+_SKY_T = 0x7FFF
 
 
 def _sky():
@@ -46,10 +67,6 @@ def _sky():
         "checker": 0,
         "hit_flip": 0,
     }
-
-
-def _hit_point(origin, direction, t):
-    return vadd(origin, scal_vec(t, direction, FMT_DIR))
 
 
 def _checker_from_point(point):
@@ -92,57 +109,112 @@ def _kshift_vec(vec, k):
     return tuple(_kshift(part, k) for part in vec)
 
 
-def _offset(along, direction, to_vec):
-    return vsub(scal_vec(along, direction, FMT_DIR), to_vec)
+def _neg16(raw):
+    return clamp16(-signed16(raw))
 
 
-def _offsq(offset, k):
-    offset_s = _kshift_vec(offset, k)
-    return vdot(offset_s, offset_s, FMT_POS)
+def _as_vec(value):
+    if isinstance(value, (tuple, list)):
+        return tuple(int(part) & 0xFFFF for part in value)
+    return (int(value) & 0xFFFF, 0, 0)
 
 
-def _offset_s(along, direction, to_vec, k):
-    along_s = shift_k(along, k)
-    to_s = shift_vec(to_vec, k)
-    return vsub(scal_vec(along_s, direction, FMT_DIR), to_s)
+def _encode_result(result, opcode, fmt):
+    to_u16 = (
+        convert_float_to_2_14_u16 if fmt == "dir" else convert_float_to_9_7_u16
+    )
+    if isinstance(result, (tuple, list)):
+        x, y, z = result
+        return pack_vec3_u16(to_u16(x), to_u16(y), to_u16(z))
+    if opcode in _COMPARE_OPS:
+        return pack_vec3_u16(1 if result else 0, 0, 0)
+    return pack_vec3_u16(to_u16(result), 0, 0)
+
+
+def _macro(opcode, u, v=0, fmt_dir=False, k=0, sh_u=0, sh_v=0, neg_v=False):
+    """One IU request: kshift/neg on the way in, then the mock FU encode."""
+    u = list(_as_vec(u))
+    v = list(_as_vec(v))
+    if sh_u:
+        u = list(_kshift_vec(u, k if sh_u > 0 else -k))
+    if sh_v:
+        v = list(_kshift_vec(v, k if sh_v > 0 else -k))
+    if neg_v:
+        v = [_neg16(part) for part in v]
+    u = tuple(int(part) & 0xFFFF for part in u)
+    v = tuple(int(part) & 0xFFFF for part in v)
+    fmt = "dir" if fmt_dir else "pos"
+    return _encode_result(vector_algebra(opcode, u, v, fmt=fmt), opcode, fmt)
+
+
+def _lane_x(packed):
+    return int(packed) & 0xFFFF
+
+
+def _lane_vec(packed):
+    packed = int(packed) & ((1 << 48) - 1)
+    x = packed & 0xFFFF
+    y = (packed >> 16) & 0xFFFF
+    z = (packed >> 32) & 0xFFFF
+    return (x, y, z)
+
+
+def _bit0(packed):
+    return _lane_x(packed) & 1
+
+
+def _hit_point(origin, direction, t):
+    scaled = _lane_vec(_macro(M_SCAL_VEC, t, direction, fmt_dir=True))
+    return _macro(M_VADD, origin, scaled, fmt_dir=False)
 
 
 def _bv_reachable(origin, direction, centre, radius):
     k = k_radius(radius)
     r_s = _kshift(radius, k)
-    r_s2 = mul(r_s, r_s, FMT_POS)
-    to_centre = vsub(centre, origin)
-    along = vdot(to_centre, direction, FMT_DIR)
-    to_centre_s = _kshift_vec(to_centre, k)
-    if vdot(to_centre_s, to_centre_s, FMT_POS) < r_s2:
+    r_s2 = _lane_x(_macro(M_MUL, r_s, r_s, fmt_dir=False))
+    to_centre = _lane_vec(_macro(M_VSUB, centre, origin, fmt_dir=False))
+    along = _lane_x(_macro(M_DOT, to_centre, direction, fmt_dir=True))
+    tcsq = _lane_x(
+        _macro(M_DOT, to_centre, to_centre, fmt_dir=False, k=k, sh_u=1, sh_v=1)
+    )
+    if _bit0(_macro(M_LT, tcsq, r_s2, fmt_dir=False)):
         return True
-    if along < 0:
+    if _bit0(_macro(M_LT, along, 0, fmt_dir=False)):
         return False
-    offset = _offset(along, direction, to_centre)
-    return _offsq(offset, k) < r_s2
+    scaled = _lane_vec(_macro(M_SCAL_VEC, along, direction, fmt_dir=True))
+    offset = _lane_vec(_macro(M_VSUB, scaled, to_centre, fmt_dir=False))
+    offsq = _lane_x(
+        _macro(M_DOT, offset, offset, fmt_dir=False, k=k, sh_u=1, sh_v=1)
+    )
+    return bool(_bit0(_macro(M_LT, offsq, r_s2, fmt_dir=False)))
 
 
-def _sphere_test(sram, addr, origin, direction):
+def _sphere_test(sram, addr, origin, direction, best_t):
     radius = signed16(sram[addr + 3])
     centre = _read_zyx(sram, addr + 4)
     k = k_radius(radius)
     r_s = _kshift(radius, k)
-    r_s2 = mul(r_s, r_s, FMT_POS)
-    to_centre = vsub(centre, origin)
-    along = vdot(to_centre, direction, FMT_DIR)
-    offset = _offset(along, direction, to_centre)
-    off_s2 = _offsq(offset, k)
-    if not (off_s2 < r_s2):
+    r_s2 = _lane_x(_macro(M_MUL, r_s, r_s, fmt_dir=False))
+    to_centre = _lane_vec(_macro(M_VSUB, centre, origin, fmt_dir=False))
+    along = _lane_x(_macro(M_DOT, to_centre, direction, fmt_dir=True))
+    scaled = _lane_vec(_macro(M_SCAL_VEC, along, direction, fmt_dir=True))
+    offset = _lane_vec(_macro(M_VSUB, scaled, to_centre, fmt_dir=False))
+    off_s2 = _lane_x(
+        _macro(M_DOT, offset, offset, fmt_dir=False, k=k, sh_u=1, sh_v=1)
+    )
+    if not _bit0(_macro(M_LT, off_s2, r_s2, fmt_dir=False)):
         return None
-    half_s = sqrt_fmt(sub(r_s2, off_s2), FMT_POS)
-    half = _kshift(half_s, -k)
-    t = sub(along, half)
+    half2 = _lane_x(_macro(M_SUB, r_s2, off_s2, fmt_dir=False))
+    half_s = _lane_x(_macro(M_SQRT, half2, 0, fmt_dir=False))
+    t = _lane_x(_macro(M_SUB, along, half_s, fmt_dir=False, k=k, sh_v=-1))
     inside = False
-    if not (BEHIND_T < t):
-        t = add(along, half)
+    if not _bit0(_macro(M_LT, _C0156, t, fmt_dir=False)):
+        t = _lane_x(_macro(M_ADD, along, half_s, fmt_dir=False, k=k, sh_v=-1))
         inside = True
-        if not (BEHIND_T < t):
+        if not _bit0(_macro(M_LT, _C0156, t, fmt_dir=False)):
             return None
+    if not _bit0(_macro(M_LT, t, best_t, fmt_dir=False)):
+        return None
     return {
         "kind": "sphere",
         "t": t,
@@ -151,6 +223,12 @@ def _sphere_test(sram, addr, origin, direction):
         "centre": centre,
         "radius": radius,
     }
+
+
+def _offset_s(along, direction, to_vec, k):
+    along_s = shift_k(along, k)
+    to_s = shift_vec(to_vec, k)
+    return vsub(scal_vec(along_s, direction, FMT_DIR), to_s)
 
 
 def _triangle_test(sram, addr, origin, direction):
@@ -235,8 +313,8 @@ def compute_expected_result(sram, ray, bv_num):
         for _ in range(prim_count):
             prim_type = int(sram[addr]) & 1
             if prim_type == PRIM_SPH:
-                hit = _sphere_test(sram, addr, origin, direction)
-                if hit is not None and hit["t"] < best_t:
+                hit = _sphere_test(sram, addr, origin, direction, best_t)
+                if hit is not None:
                     best_t = hit["t"]
                     best = hit
                 addr += SPHERE_WORD_COUNT
@@ -244,33 +322,41 @@ def compute_expected_result(sram, ray, bv_num):
                 addr += TRIANGLE_WORD_COUNT
 
     if best is None:
-        if direction[2] < 0:
-            t = div(origin[2], sub(0, direction[2]))
-            if t != INT16_MAX:
-                point = _hit_point(origin, direction, t)
-                return {
-                    "hit": 1,
-                    "hit_ground": 1,
-                    "hit_addr": 0,
-                    "hit_point": pack48(point),
-                    "n": pack48((0, 0, DIR_ONE)),
-                    "checker": _checker_from_point(point),
-                    "hit_flip": 0,
-                }
-        return _sky()
+        if not _bit0(_macro(M_LT, direction[2], 0, fmt_dir=False)):
+            return _sky()
+        t = _lane_x(
+            _macro(M_DIV, origin[2], direction[2], fmt_dir=False, neg_v=True)
+        )
+        if t == _SKY_T:
+            return _sky()
+        point_packed = _hit_point(origin, direction, t)
+        point = _lane_vec(point_packed)
+        return {
+            "hit": 1,
+            "hit_ground": 1,
+            "hit_addr": 0,
+            "hit_point": point_packed,
+            "n": pack_vec3_u16(0, 0, DIR_ONE),
+            "checker": _checker_from_point(point),
+            "hit_flip": 0,
+        }
 
-    point = _hit_point(origin, direction, best["t"])
+    point_packed = _hit_point(origin, direction, best["t"])
+    point = _lane_vec(point_packed)
     if best["inside"]:
-        n = sphere_norm(best["radius"], vsub(best["centre"], point))
+        diff = _lane_vec(
+            _macro(M_VSUB, best["centre"], point, fmt_dir=False)
+        )
     else:
-        n = sphere_norm(best["radius"], vsub(point, best["centre"]))
+        diff = _lane_vec(_macro(M_VSUB, point, best["centre"], fmt_dir=False))
+    n_packed = _macro(M_SPHERE_NORM, best["radius"], diff, fmt_dir=False)
 
     return {
         "hit": 1,
         "hit_ground": 0,
         "hit_addr": best["addr"],
-        "hit_point": pack48(point),
-        "n": pack48(n),
+        "hit_point": point_packed,
+        "n": n_packed,
         "checker": 0,
         "hit_flip": 1 if best["inside"] else 0,
     }
