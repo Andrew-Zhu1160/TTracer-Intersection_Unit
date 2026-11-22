@@ -44,15 +44,19 @@ async def test_intersection_unit(dut):
     cocotb.start_soon(sram.run(test_mode))
     ray_origin, ray_dir = await rtu.init_request(test_mode)
 
-    expected_result = compute_expected_result(sram, (ray_origin, ray_dir), sram.bv_num)
+    expected_result = compute_expected_result(
+        sram.sram, (ray_origin, ray_dir), sram.bv_num
+    )
 
-    assert expected_result.hit == dut.hit.value
-    assert expected_result.hit_ground == dut.hit_ground.value
-    assert expected_result.hit_addr == dut.hit_addr.value
-    assert expected_result.hit_point == dut.hit_point.value
-    assert expected_result.n == dut.n.value
-    assert expected_result.checker == dut.checker.value
-    assert expected_result.hit_flip == dut.hit_flip.value
+    assert expected_result["hit"] == int(dut.hit.value)
+    assert expected_result["hit_ground"] == int(dut.hit_ground.value)
+    assert expected_result["hit_addr"] == int(dut.hit_addr.value)
+    assert expected_result["hit_point"] == int(dut.hit_point.value)
+    assert expected_result["n"] == int(dut.n.value)
+    assert expected_result["checker"] == int(dut.checker_bit.value)
+    assert expected_result["hit_flip"] == int(dut.hit_flip.value)
+
+
 
 #--------------------- BASELINE STATE TESTS ---------------------#
 @cocotb.test(timeout_time=5, timeout_unit="sec")

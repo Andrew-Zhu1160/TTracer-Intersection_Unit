@@ -22,8 +22,6 @@ from utils.fixed_point import (
     m_norm,
     mul,
     pack48,
-    quantize_dir,
-    quantize_pos,
     scal_vec,
     shift_k,
     shift_vec,
@@ -210,8 +208,8 @@ def _triangle_normal(sram, hit):
 
 def compute_expected_result(sram, ray, bv_num):
     origin_in, dir_in = ray
-    origin = tuple(quantize_pos(part) for part in origin_in)
-    direction = m_norm(tuple(quantize_dir(part) for part in dir_in))
+    origin = tuple(signed16(part) for part in origin_in)
+    direction = m_norm(tuple(signed16(part) for part in dir_in))
 
     best_t = BEST_T_INIT
     best = None

@@ -38,18 +38,22 @@ class MockSRAM:
             if int(self.dut.sram_rd.value) != 1:
                 continue
 
-            addr = int(self.dut.sram_addr.value)
-            if test_mode == "FIXED":
-                delay = 10
-            else:
-                delay = random.randint(0, 50)
+            while True:
+                addr = int(self.dut.sram_addr.value)
+                if test_mode == "FIXED":
+                    delay = 10
+                else:
+                    delay = random.randint(0, 50)
 
-            if delay:
-                await ClockCycles(self.dut.clk, delay)
+                if delay:
+                    await ClockCycles(self.dut.clk, delay)
 
-            await RisingEdge(self.dut.clk)
-            self.dut.sram_data.value = self.sram[addr]
-            self.dut.sram_valid.value = 1
+                self.dut.sram_data.value = self.sram[addr]
+                self.dut.sram_valid.value = 1
 
-            await RisingEdge(self.dut.clk)
-            self.dut.sram_valid.value = 0
+                await RisingEdge(self.dut.clk)
+                next_rd = int(self.dut.sram_rd.value)
+                self.dut.sram_valid.value = 0
+
+                if int(self.dut.rst_n.value) == 0 or next_rd != 1:
+                    break

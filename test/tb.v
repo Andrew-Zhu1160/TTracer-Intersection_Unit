@@ -22,7 +22,9 @@ module tb_intersection_unit ();
   wire        done;
   wire        hit;
   wire        hit_ground;
-  wire [15:0] hit_t;
+  wire [47:0] hit_point;
+  wire [47:0] n;
+  wire        checker_bit;
   wire [8:0]  hit_addr;
   wire        hit_flip;
 
@@ -61,7 +63,9 @@ module tb_intersection_unit ();
       .done       (done),
       .hit        (hit),
       .hit_ground (hit_ground),
-      .hit_t      (hit_t),
+     .hit_point   (hit_point),
+     .n           (n),
+     .checker_bit (checker_bit),
       .hit_addr   (hit_addr),
       .hit_flip   (hit_flip),
       .ray_origin (ray_origin),

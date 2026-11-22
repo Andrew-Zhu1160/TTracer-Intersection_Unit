@@ -82,54 +82,57 @@ class MOCK_MACRO_OPS:
             if int(self.dut.req_valid.value) != 1:
                 continue
 
-            req_op = int(self.dut.req_op.value)
-            fmt_bit = (req_op >> 101) & 1
-            u = _unpack_vec3(req_op >> 53)
-            v = _unpack_vec3(req_op >> 5)
-            opcode = req_op & 0x1F
-            fmt = "dir" if fmt_bit else "pos"
-            result = _encode_result(
-                vector_algebra(opcode, u, v, fmt=fmt), opcode, fmt
-            )
+            while True:
+                req_op = int(self.dut.req_op.value)
+                fmt_bit = (req_op >> 101) & 1
+                u = _unpack_vec3(req_op >> 53)
+                v = _unpack_vec3(req_op >> 5)
+                opcode = req_op & 0x1F
+                fmt = "dir" if fmt_bit else "pos"
+                result = _encode_result(
+                    vector_algebra(opcode, u, v, fmt=fmt), opcode, fmt
+                )
 
-            wait_low = (
-                WAIT_TILL_VALID
-                if test_mode == "FIXED"
-                else random.randint(0, CRV_MACRO_WAIT_MAX)
-            )
+                wait_low = (
+                    WAIT_TILL_VALID
+                    if test_mode == "FIXED"
+                    else random.randint(0, CRV_MACRO_WAIT_MAX)
+                )
 
-            # Next posedge: IU samples req_ready=0; hold it low wait_low cycles.
-            if wait_low > 0:
-                self.dut.req_ready.value = 0
-                if await self._wait_cycles_or_reset(wait_low):
+                # Next posedge: IU samples req_ready=0; hold it low wait_low cycles.
+                if wait_low > 0:
+                    self.dut.req_ready.value = 0
+                    if await self._wait_cycles_or_reset(wait_low):
+                        self._drive_idle()
+                        break
+
+                self.dut.req_ready.value = 1
+                if await self._wait_cycles_or_reset(WAIT_TILL_VALID):
                     self._drive_idle()
-                    continue
-
-            self.dut.req_ready.value = 1
-            if await self._wait_cycles_or_reset(WAIT_TILL_VALID):
-                self._drive_idle()
-                continue
-
-            self.dut.resp_result.value = result
-            self.dut.resp_valid.value = 1
-
-            saw_resp_ready = False
-            while not saw_resp_ready:
-                await RisingEdge(self.dut.clk)
-                if int(self.dut.rst_n.value) == 0:
                     break
-                if int(self.dut.resp_ready.value) == 1:
-                    saw_resp_ready = True
 
-            if int(self.dut.rst_n.value) == 0:
-                self._drive_idle()
-                continue
+                # Drop ready with the response so the IU holds S_DEC_SEND
+                # instead of taking the next op while this mock is not looking.
+                self.dut.req_ready.value = 0
+                self.dut.resp_result.value = result
+                self.dut.resp_valid.value = 1
 
-            await RisingEdge(self.dut.clk)
-            if int(self.dut.rst_n.value) == 0:
-                self._drive_idle()
-                continue
-            self.dut.resp_valid.value = 0
+                saw_resp_ready = False
+                while not saw_resp_ready:
+                    await RisingEdge(self.dut.clk)
+                    if int(self.dut.rst_n.value) == 0:
+                        break
+                    if int(self.dut.resp_ready.value) == 1:
+                        saw_resp_ready = True
+
+                if int(self.dut.rst_n.value) == 0:
+                    self._drive_idle()
+                    break
+
+                next_req = int(self.dut.req_valid.value)
+                self.dut.resp_valid.value = 0
+                if next_req != 1:
+                    break
 
 
 class MOCK_RTU(MOCK_MACRO_OPS):
@@ -170,4 +173,4 @@ class MOCK_RTU(MOCK_MACRO_OPS):
                 f"timed out after {TEST_TIMEOUT_MIN} min waiting for dut.done"
             )
 
-        return self.dut.ray_origin.value, self.dut.ray_dir.value
+        return origin, direction

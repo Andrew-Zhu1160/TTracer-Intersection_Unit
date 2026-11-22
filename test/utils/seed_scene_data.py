@@ -104,7 +104,7 @@ def _random_triangle_words(bv_index):
 
 
 
-def random_scene():
+def random_scene(sphere_only=False):
     """Generate legal BV counts, primitive mixes, and contiguous addresses."""
     bv_num = random.randint(1, 15)
     budget = (SRAM_DEPTH - BV_START_ADDR) - BV_WORD_COUNT * bv_num
@@ -118,14 +118,18 @@ def random_scene():
         max_count = min(127, max_words // SPHERE_WORD_COUNT)
         bv_count = random.randint(1, max_count)
 
-        # Replacing a 7-word sphere with a triangle costs five extra words.
-        max_tri = min(
-            bv_count,
-            (max_words - SPHERE_WORD_COUNT * bv_count)
-            // (TRIANGLE_WORD_COUNT - SPHERE_WORD_COUNT),
-        )
-        n_tri = random.randint(0, max_tri)
-        n_sph = bv_count - n_tri
+        if sphere_only:
+            n_tri = 0
+            n_sph = bv_count
+        else:
+            # Replacing a 7-word sphere with a triangle costs five extra words.
+            max_tri = min(
+                bv_count,
+                (max_words - SPHERE_WORD_COUNT * bv_count)
+                // (TRIANGLE_WORD_COUNT - SPHERE_WORD_COUNT),
+            )
+            n_tri = random.randint(0, max_tri)
+            n_sph = bv_count - n_tri
         words = (
             SPHERE_WORD_COUNT * n_sph
             + TRIANGLE_WORD_COUNT * n_tri
@@ -164,8 +168,19 @@ def generate_test_case_and_hydrate_sram(sram, test_mode):
             (123, MIN_COORD_Z, POS_MAX, -101),
             (MAX_R, 127, POS_MAX, 101),
         ]
+    elif test_mode == "RANDOM_SPHERE":
+        bv_num, scene = random_scene(sphere_only=True)
+        bv_geometry = [
+            (
+                random.randint(MIN_R, MAX_R),
+                random.randint(MIN_COORD_Z, MAX_COORD_Z),
+                random.randint(POS_MIN, POS_MAX),
+                random.randint(POS_MIN, POS_MAX),
+            )
+            for _ in range(bv_num)
+        ]
     else:
-        bv_num, scene = random_scene()
+        bv_num, scene = random_scene(sphere_only=False)
         bv_geometry = [
             (
                 random.randint(MIN_R, MAX_R),
