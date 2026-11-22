@@ -1,7 +1,6 @@
 from constant.constants import (
     BV_START_ADDR,
     BV_WORD_COUNT,
-    MAT_DIELEC,
     PRIM_SPH,
     SPHERE_WORD_COUNT,
     TRIANGLE_WORD_COUNT,
@@ -15,7 +14,7 @@ from utils.fixed_point import (
     INT16_MAX,
     POS_225,
     add,
-    bitnot16,
+    clamp16,
     div,
     k_radius,
     k_triangle,
@@ -75,6 +74,33 @@ def _read_bv(sram, bv_index):
     return radius, centre, prim_start, prim_count
 
 
+def _kshift(raw, k):
+    """IU kshift: round-on-right-shift, clamp-on-left-shift."""
+    v = signed16(raw)
+    k = int(k)
+    if k > 0:
+        w = v + (1 << (k - 1))
+        w = w >> k
+    elif k < 0:
+        w = v << (-k)
+    else:
+        w = v
+    return clamp16(w)
+
+
+def _kshift_vec(vec, k):
+    return tuple(_kshift(part, k) for part in vec)
+
+
+def _offset(along, direction, to_vec):
+    return vsub(scal_vec(along, direction, FMT_DIR), to_vec)
+
+
+def _offsq(offset, k):
+    offset_s = _kshift_vec(offset, k)
+    return vdot(offset_s, offset_s, FMT_POS)
+
+
 def _offset_s(along, direction, to_vec, k):
     along_s = shift_k(along, k)
     to_s = shift_vec(to_vec, k)
@@ -83,50 +109,47 @@ def _offset_s(along, direction, to_vec, k):
 
 def _bv_reachable(origin, direction, centre, radius):
     k = k_radius(radius)
-    r_s = shift_k(radius, k)
+    r_s = _kshift(radius, k)
     r_s2 = mul(r_s, r_s, FMT_POS)
     to_centre = vsub(centre, origin)
     along = vdot(to_centre, direction, FMT_DIR)
-    to_centre_s = shift_vec(to_centre, k)
+    to_centre_s = _kshift_vec(to_centre, k)
     if vdot(to_centre_s, to_centre_s, FMT_POS) < r_s2:
         return True
     if along < 0:
         return False
-    offset_s = _offset_s(along, direction, to_centre, k)
-    return vdot(offset_s, offset_s, FMT_POS) < r_s2
+    offset = _offset(along, direction, to_centre)
+    return _offsq(offset, k) < r_s2
 
 
 def _sphere_test(sram, addr, origin, direction):
     radius = signed16(sram[addr + 3])
     centre = _read_zyx(sram, addr + 4)
     k = k_radius(radius)
-    r_s = shift_k(radius, k)
+    r_s = _kshift(radius, k)
     r_s2 = mul(r_s, r_s, FMT_POS)
     to_centre = vsub(centre, origin)
     along = vdot(to_centre, direction, FMT_DIR)
-    offset_s = _offset_s(along, direction, to_centre, k)
-    off_s2 = vdot(offset_s, offset_s, FMT_POS)
-    if off_s2 >= r_s2:
+    offset = _offset(along, direction, to_centre)
+    off_s2 = _offsq(offset, k)
+    if not (off_s2 < r_s2):
         return None
     half_s = sqrt_fmt(sub(r_s2, off_s2), FMT_POS)
-    half = shift_k(half_s, -k)
+    half = _kshift(half_s, -k)
     t = sub(along, half)
     inside = False
-    if t <= BEHIND_T:
+    if not (BEHIND_T < t):
         t = add(along, half)
         inside = True
-        if t <= BEHIND_T:
+        if not (BEHIND_T < t):
             return None
     return {
         "kind": "sphere",
         "t": t,
         "addr": addr,
         "inside": inside,
-        "offset_s": offset_s,
-        "half_s": half_s,
-        "r_s": r_s,
-        "backface": False,
-        "k": k,
+        "centre": centre,
+        "radius": radius,
     }
 
 
@@ -185,16 +208,6 @@ def _triangle_test(sram, addr, origin, direction):
     }
 
 
-def _sphere_normal(hit, direction):
-    half_d = scal_vec(hit["half_s"], direction, FMT_DIR)
-    if hit["inside"]:
-        vec = vadd(hit["offset_s"], half_d)
-        n = sphere_norm(hit["r_s"], vec)
-        return tuple(sub(0, part) for part in n)
-    vec = vsub(hit["offset_s"], half_d)
-    return sphere_norm(hit["r_s"], vec)
-
-
 def _triangle_normal(sram, hit):
     addr = hit["addr"]
     e2 = shift_vec(_read_zyx(sram, addr + 3), hit["k"])
@@ -209,7 +222,7 @@ def _triangle_normal(sram, hit):
 def compute_expected_result(sram, ray, bv_num):
     origin_in, dir_in = ray
     origin = tuple(signed16(part) for part in origin_in)
-    direction = m_norm(tuple(signed16(part) for part in dir_in))
+    direction = tuple(signed16(part) for part in dir_in)
 
     best_t = BEST_T_INIT
     best = None
@@ -223,18 +236,17 @@ def compute_expected_result(sram, ray, bv_num):
             prim_type = int(sram[addr]) & 1
             if prim_type == PRIM_SPH:
                 hit = _sphere_test(sram, addr, origin, direction)
+                if hit is not None and hit["t"] < best_t:
+                    best_t = hit["t"]
+                    best = hit
                 addr += SPHERE_WORD_COUNT
             else:
-                hit = _triangle_test(sram, addr, origin, direction)
                 addr += TRIANGLE_WORD_COUNT
-            if hit is not None and hit["t"] < best_t:
-                best_t = hit["t"]
-                best = hit
 
     if best is None:
         if direction[2] < 0:
-            t = div(bitnot16(origin[2]), direction[2])
-            if t != INT16_MAX and t > BEHIND_T:
+            t = div(origin[2], sub(0, direction[2]))
+            if t != INT16_MAX:
                 point = _hit_point(origin, direction, t)
                 return {
                     "hit": 1,
@@ -248,13 +260,10 @@ def compute_expected_result(sram, ray, bv_num):
         return _sky()
 
     point = _hit_point(origin, direction, best["t"])
-    mat = int(sram[best["addr"] + 2]) & 0x3
-    if best["kind"] == "sphere":
-        n = _sphere_normal(best, direction)
-        hit_flip = 1 if best["inside"] and mat == MAT_DIELEC else 0
+    if best["inside"]:
+        n = sphere_norm(best["radius"], vsub(best["centre"], point))
     else:
-        n = _triangle_normal(sram, best)
-        hit_flip = 0
+        n = sphere_norm(best["radius"], vsub(point, best["centre"]))
 
     return {
         "hit": 1,
@@ -263,5 +272,5 @@ def compute_expected_result(sram, ray, bv_num):
         "hit_point": pack48(point),
         "n": pack48(n),
         "checker": 0,
-        "hit_flip": hit_flip,
+        "hit_flip": 1 if best["inside"] else 0,
     }

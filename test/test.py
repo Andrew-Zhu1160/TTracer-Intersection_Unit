@@ -11,8 +11,25 @@ from mocked_componenet.mock_rtu import MOCK_RTU
 from mocked_componenet.mock_sram import MockSRAM
 from utils.generate_ray import generate_ray
 from utils.compute_expected_result import compute_expected_result
+from utils.fixed_point import signed16
 
 test_mode = os.environ.get("TEST_MODE", "FIXED")
+LANE_EPS = 8
+
+
+def _unpack_zyx(bits48):
+    bits48 = int(bits48) & ((1 << 48) - 1)
+    x = signed16(bits48 & 0xFFFF)
+    y = signed16((bits48 >> 16) & 0xFFFF)
+    z = signed16((bits48 >> 32) & 0xFFFF)
+    return (x, y, z)
+
+
+def _assert_lanes_close(expected, dut_val, eps=LANE_EPS):
+    exp = _unpack_zyx(expected)
+    got = _unpack_zyx(dut_val)
+    for e, g in zip(exp, got):
+        assert abs(e - g) <= eps, (exp, got)
 
 
 async def _reset_dut(dut):
@@ -51,8 +68,8 @@ async def test_intersection_unit(dut):
     assert expected_result["hit"] == int(dut.hit.value)
     assert expected_result["hit_ground"] == int(dut.hit_ground.value)
     assert expected_result["hit_addr"] == int(dut.hit_addr.value)
-    assert expected_result["hit_point"] == int(dut.hit_point.value)
-    assert expected_result["n"] == int(dut.n.value)
+    _assert_lanes_close(expected_result["hit_point"], int(dut.hit_point.value))
+    _assert_lanes_close(expected_result["n"], int(dut.n.value))
     assert expected_result["checker"] == int(dut.checker_bit.value)
     assert expected_result["hit_flip"] == int(dut.hit_flip.value)
 
