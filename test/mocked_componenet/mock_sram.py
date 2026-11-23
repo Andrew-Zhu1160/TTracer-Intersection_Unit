@@ -18,11 +18,11 @@ class MockSRAM:
     dut = None
     bv_num = None
 
-    def __init__(self, dut, test_mode):
+    def __init__(self, dut, test_mode, fix_scene_config=None):
         self.dut = dut
         self.sram = [0] * 512
         self.bv_num = generate_test_case_and_hydrate_sram(
-            self.sram, test_mode
+            self.sram, test_mode, fix_scene_config
         )
 
     async def run(self, test_mode):

@@ -7,6 +7,12 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import ClockCycles
 
+from constant.fix_scene_config import (
+    TEST_INTERSECTION_UNIT_GENERAL,
+    TEST_SPHERE_HIT_INSIDE,
+    TEST_SPHERE_HIT_OUTSIDE,
+    TEST_SPHERE_MISS,
+)
 from mocked_componenet.mock_rtu import MOCK_RTU
 from mocked_componenet.mock_sram import MockSRAM
 from utils.generate_ray import generate_ray
@@ -56,10 +62,12 @@ async def test_intersection_unit(dut):
     cocotb.start_soon(clock.start())
     await _reset_dut(dut)
 
-    sram = MockSRAM(dut, test_mode)
+    sram = MockSRAM(dut, test_mode, TEST_INTERSECTION_UNIT_GENERAL)
     rtu = MOCK_RTU(dut, sram.bv_num, test_mode)
     cocotb.start_soon(sram.run(test_mode))
-    ray_origin, ray_dir = await rtu.init_request(test_mode)
+    ray_origin, ray_dir = await rtu.init_request(
+        test_mode, TEST_INTERSECTION_UNIT_GENERAL
+    )
 
     expected_result = compute_expected_result(
         sram.sram, (ray_origin, ray_dir), sram.bv_num
@@ -150,6 +158,22 @@ async def test_sphere_hit_outside(dut):
     cocotb.start_soon(clock.start())
     await _reset_dut(dut)
 
+    sram = MockSRAM(dut, "FIXED", TEST_SPHERE_HIT_OUTSIDE)
+    rtu = MOCK_RTU(dut, sram.bv_num, "FIXED")
+    cocotb.start_soon(sram.run("FIXED"))
+    ray_origin, ray_dir = await rtu.init_request("FIXED", TEST_SPHERE_HIT_OUTSIDE)
+    expected_result = compute_expected_result(
+        sram.sram, (ray_origin, ray_dir), sram.bv_num
+    )
+
+    assert expected_result["hit"] == int(dut.hit.value)
+    assert expected_result["hit_ground"] == int(dut.hit_ground.value)
+    assert expected_result["hit_addr"] == int(dut.hit_addr.value)
+    _assert_lanes_close(expected_result["hit_point"], int(dut.hit_point.value))
+    _assert_lanes_close(expected_result["n"], int(dut.n.value))
+    assert expected_result["checker"] == int(dut.checker_bit.value)
+    assert expected_result["hit_flip"] == int(dut.hit_flip.value)
+
 @cocotb.test(timeout_time=5, timeout_unit="sec")
 async def test_sphere_hit_inside(dut):
     dut._log.info("Start sphere_hit_inside")
@@ -157,12 +181,44 @@ async def test_sphere_hit_inside(dut):
     cocotb.start_soon(clock.start())
     await _reset_dut(dut)
 
+    sram = MockSRAM(dut, "FIXED", TEST_SPHERE_HIT_INSIDE)
+    rtu = MOCK_RTU(dut, sram.bv_num, "FIXED")
+    cocotb.start_soon(sram.run("FIXED"))
+    ray_origin, ray_dir = await rtu.init_request("FIXED", TEST_SPHERE_HIT_INSIDE)
+    expected_result = compute_expected_result(
+        sram.sram, (ray_origin, ray_dir), sram.bv_num
+    )
+
+    assert expected_result["hit"] == int(dut.hit.value)
+    assert expected_result["hit_ground"] == int(dut.hit_ground.value)
+    assert expected_result["hit_addr"] == int(dut.hit_addr.value)
+    _assert_lanes_close(expected_result["hit_point"], int(dut.hit_point.value))
+    _assert_lanes_close(expected_result["n"], int(dut.n.value))
+    assert expected_result["checker"] == int(dut.checker_bit.value)
+    assert expected_result["hit_flip"] == int(dut.hit_flip.value)
+
 @cocotb.test(timeout_time=5, timeout_unit="sec")
 async def test_sphere_miss(dut):
     dut._log.info("Start sphere_miss")
     clock = Clock(dut.clk, 10, units="us")
     cocotb.start_soon(clock.start())
     await _reset_dut(dut)
+
+    sram = MockSRAM(dut, "FIXED", TEST_SPHERE_MISS)
+    rtu = MOCK_RTU(dut, sram.bv_num, "FIXED")
+    cocotb.start_soon(sram.run("FIXED"))
+    ray_origin, ray_dir = await rtu.init_request("FIXED", TEST_SPHERE_MISS)
+    expected_result = compute_expected_result(
+        sram.sram, (ray_origin, ray_dir), sram.bv_num
+    )
+
+    assert expected_result["hit"] == int(dut.hit.value)
+    assert expected_result["hit_ground"] == int(dut.hit_ground.value)
+    assert expected_result["hit_addr"] == int(dut.hit_addr.value)
+    _assert_lanes_close(expected_result["hit_point"], int(dut.hit_point.value))
+    _assert_lanes_close(expected_result["n"], int(dut.n.value))
+    assert expected_result["checker"] == int(dut.checker_bit.value)
+    assert expected_result["hit_flip"] == int(dut.hit_flip.value)
 
 #--------------------- TRIANGLE TESTS ---------------------#
 @cocotb.test(timeout_time=5, timeout_unit="sec")

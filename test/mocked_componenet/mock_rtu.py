@@ -157,8 +157,20 @@ class MOCK_RTU(MOCK_MACRO_OPS):
     async def run(self, test_mode):
         await super().run(test_mode)
 
-    async def init_request(self, test_mode):
-        origin, direction = generate_ray(test_mode)
+    async def init_request(self, test_mode, fix_scene_config=None):
+        if test_mode == "FIXED":
+            if fix_scene_config is None:
+                raise ValueError("FIXED requires fix_scene_config")
+            origin = tuple(
+                convert_float_to_9_7_u16(part)
+                for part in fix_scene_config["ray_origin"]
+            )
+            direction = tuple(
+                convert_float_to_2_14_u16(part)
+                for part in fix_scene_config["ray_dir"]
+            )
+        else:
+            origin, direction = generate_ray(test_mode)
         self.dut.ray_origin.value = pack_vec3_u16(*origin)
         self.dut.ray_dir.value = pack_vec3_u16(*direction)
 

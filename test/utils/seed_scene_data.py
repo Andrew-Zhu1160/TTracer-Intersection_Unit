@@ -18,7 +18,7 @@ from constant.constants import (
     POS_MAX,
 )
 import random
-from utils.convert_u16_to_float import _u16
+from utils.convert_u16_to_float import _u16, convert_float_to_9_7_u16
 
 
 
@@ -142,7 +142,13 @@ def random_scene(sphere_only=False):
     return bv_num, scene
 
 
-def generate_test_case_and_hydrate_sram(sram, test_mode):
+def _pos_word(value):
+    if isinstance(value, float):
+        return convert_float_to_9_7_u16(value)
+    return _u16(value)
+
+
+def generate_test_case_and_hydrate_sram(sram, test_mode, fix_scene_config=None):
     """Fill a 512-word SRAM image and return the generated BV count."""
     if len(sram) != SRAM_DEPTH:
         raise ValueError(f"SRAM image must contain {SRAM_DEPTH} words")
@@ -151,23 +157,13 @@ def generate_test_case_and_hydrate_sram(sram, test_mode):
     sram[:] = [0] * SRAM_DEPTH
 
     if test_mode == "FIXED":
-        bv_num = 6
-        scene = [
-            (47, 5, 5, 0),
-            (82, 3, 0, 3),
-            (118, 2, 1, 1),
-            (137, 4, 4, 0),
-            (165, 1, 0, 1),
-            (177, 3, 2, 1),
-        ]
-        bv_geometry = [
-            (347, 549, -751, 953),
-            (127, 987, -654, 321),
-            (MAX_R, 456, 789, 101),
-            (123, MAX_COORD_Z, 789, 0),
-            (123, MIN_COORD_Z, POS_MAX, -101),
-            (MAX_R, 127, POS_MAX, 101),
-        ]
+        if fix_scene_config is None:
+            raise ValueError("FIXED requires fix_scene_config")
+        bv_num = fix_scene_config["bv_num"]
+        scene = fix_scene_config["scene"]
+        bv_geometry = fix_scene_config["bv_geometry"]
+        sphere_iter = iter(fix_scene_config["spheres"])
+        triangle_iter = iter(fix_scene_config["triangles"])
     elif test_mode == "RANDOM_SPHERE":
         bv_num, scene = random_scene(sphere_only=True)
         bv_geometry = [
@@ -199,52 +195,52 @@ def generate_test_case_and_hydrate_sram(sram, test_mode):
         bv_addr = BV_START_ADDR + BV_WORD_COUNT * bv_index
         sram[bv_addr : bv_addr + BV_WORD_COUNT] = [
             _pack_bv_w0(prim_addr, bv_count),
-            _u16(radius),
-            _u16(z),
-            _u16(y),
-            _u16(x),
+            _pos_word(radius),
+            _pos_word(z),
+            _pos_word(y),
+            _pos_word(x),
         ]
 
     # Primitive lists are contiguous within each BV and are stored in BV order.
-    fixed_object_index = 0
     for bv_index, (prim_addr, _, n_sph, n_tri) in enumerate(scene):
         cursor = prim_addr
 
         for _ in range(n_sph):
             if test_mode == "FIXED":
+                sph = next(sphere_iter)
                 words = _sphere_words(
                     bv_index,
-                    radius=128 + fixed_object_index,
-                    z=256 + fixed_object_index,
-                    y=-64 + fixed_object_index,
-                    x=64 + fixed_object_index,
-                    mat=MAT_TYPE,
+                    radius=_pos_word(sph["radius"]),
+                    z=_pos_word(sph["z"]),
+                    y=_pos_word(sph["y"]),
+                    x=_pos_word(sph["x"]),
+                    mat=sph["mat"],
                 )
             else:
                 words = _random_sphere_words(bv_index)
 
             sram[cursor : cursor + SPHERE_WORD_COUNT] = words
             cursor += SPHERE_WORD_COUNT
-            fixed_object_index += 1
 
         for _ in range(n_tri):
             if test_mode == "FIXED":
+                tri = next(triangle_iter)
+                ox, oy, oz = tri["origin"]
                 words = _triangle_words(
                     bv_index,
-                    e2=(0, 128, 0),
-                    e1=(128, 0, 0),
+                    e2=tuple(_pos_word(part) for part in tri["e2"]),
+                    e1=tuple(_pos_word(part) for part in tri["e1"]),
                     origin=(
-                        32 + fixed_object_index,
-                        -32 + fixed_object_index,
-                        256 + fixed_object_index,
+                        _pos_word(ox),
+                        _pos_word(oy),
+                        _pos_word(oz),
                     ),
-                    mat=MAT_TYPE,
+                    mat=tri["mat"],
                 )
             else:
                 words = _random_triangle_words(bv_index)
-            
+
             sram[cursor : cursor + TRIANGLE_WORD_COUNT] = words
             cursor += TRIANGLE_WORD_COUNT
-            fixed_object_index += 1
 
     return bv_num
