@@ -231,7 +231,7 @@ def _offset_s(along, direction, to_vec, k):
     return vsub(scal_vec(along_s, direction, FMT_DIR), to_s)
 
 
-def _triangle_test(sram, addr, origin, direction):
+def _triangle_test(sram, addr, origin, direction, best_t):
     e2 = _read_zyx(sram, addr + 3)
     e1 = _read_zyx(sram, addr + 6)
     v0 = _read_zyx(sram, addr + 9)
@@ -272,6 +272,8 @@ def _triangle_test(sram, addr, origin, direction):
         ),
     )
     if t <= BEHIND_T:
+        return None
+    if t >= best_t:
         return None
     return {
         "kind": "triangle",
@@ -319,6 +321,10 @@ def compute_expected_result(sram, ray, bv_num):
                     best = hit
                 addr += SPHERE_WORD_COUNT
             else:
+                hit = _triangle_test(sram, addr, origin, direction, best_t)
+                if hit is not None:
+                    best_t = hit["t"]
+                    best = hit
                 addr += TRIANGLE_WORD_COUNT
 
     if best is None:
@@ -343,13 +349,18 @@ def compute_expected_result(sram, ray, bv_num):
 
     point_packed = _hit_point(origin, direction, best["t"])
     point = _lane_vec(point_packed)
-    if best["inside"]:
-        diff = _lane_vec(
-            _macro(M_VSUB, best["centre"], point, fmt_dir=False)
-        )
+    if best["kind"] == "triangle":
+        n_packed = pack_vec3_u16(*_triangle_normal(sram, best))
+        hit_flip = 1 if best["backface"] else 0
     else:
-        diff = _lane_vec(_macro(M_VSUB, point, best["centre"], fmt_dir=False))
-    n_packed = _macro(M_SPHERE_NORM, best["radius"], diff, fmt_dir=False)
+        if best["inside"]:
+            diff = _lane_vec(
+                _macro(M_VSUB, best["centre"], point, fmt_dir=False)
+            )
+        else:
+            diff = _lane_vec(_macro(M_VSUB, point, best["centre"], fmt_dir=False))
+        n_packed = _macro(M_SPHERE_NORM, best["radius"], diff, fmt_dir=False)
+        hit_flip = 1 if best["inside"] else 0
 
     return {
         "hit": 1,
@@ -358,5 +369,5 @@ def compute_expected_result(sram, ray, bv_num):
         "hit_point": point_packed,
         "n": n_packed,
         "checker": 0,
-        "hit_flip": 1 if best["inside"] else 0,
+        "hit_flip": hit_flip,
     }
